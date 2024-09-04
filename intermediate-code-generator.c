@@ -26,77 +26,72 @@ int precedence(char c){
     else if(c == '^'){
         return 3;
     }
-else{
-return 0;
-}
+    else{
+        return 0;
+    }
 }
 
 void formatter(char post[100],char stack[100]){
-int top = -1, j = 0, front = -1;
-int n = strlen(s), i = 0;
-while(s[i] != '\0'){
-if(s[i] == '('){
-top++;
-stack[top] = s[i];
-}
-else if(isalpha(s[i])){
-post[j++] = s[i];
-}
-else if(precedence(s[i])){
-while(precedence(stack[top]) >= precedence(s[i])){
-post[j++] = stack[top--];
-}
-top++;
-stack[top] = s[i];
-}
-else if(s[i] == ')'){
-while(stack[top] != '('){
-post[j++] = stack[top--];
-}
-top--;
-}
-i++;
-}
-while(top!=-1){
-post[j++] = stack[top--];
-}
-post[j] = '\0';
-printf("Postfix expression: %s\n", post);
-i = 0;
-while(post[i] != '\0'){
-if(precedence(post[i])){
-char a = queue[front--];
-char b = queue[front--];
+    int top = -1, j = 0, front = -1;
+    int n = strlen(s), i = 0;
+    while(s[i] != '\0'){
+        if(s[i] == '('){
+            top++;
+            stack[top] = s[i];
+        }
+        else if(isalpha(s[i])){
+            post[j++] = s[i];
+        }
+        else if(precedence(s[i])){
+            while(precedence(stack[top]) >= precedence(s[i])){
+                post[j++] = stack[top--];
+            }
+            top++;
+            stack[top] = s[i];
+        }
+        else if(s[i] == ')'){
+            while(stack[top] != '('){
+                post[j++] = stack[top--];
+            }
+            top--;
+        }
+        i++;
+    }
+    while(top!=-1){
+        post[j++] = stack[top--];
+    }
+    post[j] = '\0';
+    printf("Postfix expression: %s\n", post);
+    i = 0;
+    while(post[i] != '\0'){
+        if(precedence(post[i])){
+            char a = queue[front--];
+            char b = queue[front--];
 
-if(isdigit(a) && isdigit(b)){
-fprintf(fp1,"%c\tt%c\tt%c\tt%c\n", post[i], b, a, ind);
-//fprintf(fp1,"%c\tt%c\tt%c\tt%d\n", post[i], b, a, count2);
-}
-else if(isdigit(b)){
-fprintf(fp1,"%c\tt%c\t%c\tt%c\n", post[i], b, a, ind);
-//fprintf(fp1,"%c\tt%c\t%c\tt%d\n", post[i], b, a, count2);
-}
-else if(isdigit(a)){
-fprintf(fp1,"%c\t%c\tt%c\tt%c\n", post[i], b, a, ind);
-//fprintf(fp1,"%c\t%c\tt%c\tt%d\n", post[i], b, a, count2);
-}
-else{
-fprintf(fp1,"%c\t%c\t%c\tt%c\n", post[i], b, a, ind);
-//fprintf(fp1,"%c\t%c\t%c\tt%d\n", post[i], b, a, count2);
-}
-fprintf(fp2,"%c\t%c\t%c\t%c\n", ind, post[i], b, a);
-//fprintf(fp2,"%d\t%c\t%c\t%c\n", count2, post[i], b, a);
-front++;
-queue[front] = ind;
-ind++;
-count2++;
-}
-else{
-front++;
-queue[front] = post[i];
-}
-i++;
-}
+            if(isdigit(a) && isdigit(b)){
+                fprintf(fp1,"%c\tt%c\tt%c\tt%c\n", post[i], b, a, ind);
+            }
+            else if(isdigit(b)){
+                fprintf(fp1,"%c\tt%c\t%c\tt%c\n", post[i], b, a, ind);
+            }
+            else if(isdigit(a)){
+                fprintf(fp1,"%c\t%c\tt%c\tt%c\n", post[i], b, a, ind);
+            }
+            else{
+                fprintf(fp1,"%c\t%c\t%c\tt%c\n", post[i], b, a, ind);
+            }
+            fprintf(fp2,"%c\t%c\t%c\t%c\n", ind, post[i], b, a);
+            front++;
+            queue[front] = ind;
+            ind++;
+            count2++;
+        }
+        else{
+            front++;
+            queue[front] = post[i];
+        }
+        i++;
+    }
 }
 
 void main(){
