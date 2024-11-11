@@ -1,43 +1,65 @@
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 
-#define MAX_STATES 10
-#define ALPHABET_SIZE 2
+#define MAX_STATES 100
+#define MAX_SYMBOLS 26  // Assuming 26 symbols (a-z) excluding epsilon
 
-typedef struct {
-    int state;  // current state
-    int next_state;  // next state
-    char symbol;  // transition symbol (0 for epsilon)
-} Transition;
+// Global variables to store the epsilon-NFA and closures
+int epsilonTransitions[MAX_STATES][MAX_STATES];  // Transition table for epsilon transitions
+int closure[MAX_STATES][MAX_STATES];             // Closure table
+int nfa[MAX_STATES][MAX_SYMBOLS][MAX_STATES];    // NFA transitions excluding epsilon
+int numStates, numSymbols;
 
-typedef struct {
-    int transitions[MAX_STATES][ALPHABET_SIZE][MAX_STATES];  // transitions for NFA
-    int state_count;  // number of states
-} NFA;
-
-Transition epsilon_transitions[MAX_STATES][MAX_STATES];  // ε-NFA transitions
-int epsilon_count[MAX_STATES];  // count of epsilon transitions for each state
-
-void add_epsilon_transition(int from, int to) {
-    epsilon_transitions[from][epsilon_count[from]].next_state = to;
-    epsilon_transitions[from][epsilon_count[from]].state = from;
-    epsilon_transitions[from][epsilon_count[from]].symbol = 0; // 0 for epsilon
-    epsilon_count[from]++;
+// Function to perform DFS and find epsilon closure (used by calculateEpsilonClosures)
+void dfs(int state, int closureIndex) {
+    for (int i = 0; i < numStates; i++) {
+        if (epsilonTransitions[state][i] == 1 && closure[closureIndex][i] == 0) {
+            closure[closureIndex][i] = 1;
+            dfs(i, closureIndex);
+        }
+    }
 }
 
-void convert_epsilon_nfa_to_nfa(int state_count, NFA* nfa) {
-    for (int state = 0; state < state_count; state++) {
-        // For each state, process epsilon transitions
-        for (int i = 0; i < epsilon_count[state]; i++) {
-            int epsilon_target = epsilon_transitions[state][i].next_state;
+// Function to calculate epsilon closure for each state
+void calculateEpsilonClosures() {
+    for (int i = 0; i < numStates; i++) {
+        closure[i][i] = 1;
+        dfs(i, i);
+    }
+}
 
-            // Add the epsilon transitions to the NFA transitions
-            for (int j = 0; j < ALPHABET_SIZE; j++) {
-                if (nfa->transitions[epsilon_target][j]) {
-                    for (int k = 0; k < MAX_STATES; k++) {
-                        if (nfa->transitions[epsilon_target][j][k]) {
-                            nfa->transitions[state][j][k] = 1; // mark as reachable
+// Function to find union of states for a given state and symbol, considering epsilon closure
+void calculateNfaTransitions() {
+    for (int state = 0; state < numStates; state++) {
+        // Step 3.1: Get the epsilon closure for the current state (temporary array)
+        int stateClosure[MAX_STATES] = {0};
+        for (int i = 0; i < numStates; i++) {
+            if (closure[state][i]) {
+                stateClosure[i] = 1;
+            }
+        }
+
+        // Step 3.2: For each symbol (excluding epsilon), compute the union of reachable states
+        for (int symbol = 0; symbol < numSymbols; symbol++) {
+            int unionClosure[MAX_STATES] = {0};  // Temporary closure for union of transitions
+
+            // Find all transitions from each state in stateClosure using the symbol
+            for (int i = 0; i < numStates; i++) {
+                if (stateClosure[i]) {
+                    for (int k = 0; k < numStates; k++) {
+                        if (nfa[i][symbol][k]) {
+                            unionClosure[k] = 1;  // Add reachable state to unionClosure
+                        }
+                    }
+                }
+            }
+
+            // Step 3.3: Compute epsilon closure of the union and store in nfa[state][symbol]
+            for (int i = 0; i < numStates; i++) {
+                if (unionClosure[i]) {
+                    for (int j = 0; j < numStates; j++) {
+                        if (closure[i][j]) {
+                            nfa[state][symbol][j] = 1;
                         }
                     }
                 }
@@ -46,60 +68,59 @@ void convert_epsilon_nfa_to_nfa(int state_count, NFA* nfa) {
     }
 }
 
-void print_nfa(NFA* nfa) {
-    printf("NFA transitions:\n");
-    for (int i = 0; i < nfa->state_count; i++) {
-        for (int j = 0; j < ALPHABET_SIZE; j++) {
-            printf("State %d, Symbol %d: ", i, j);
-            for (int k = 0; k < MAX_STATES; k++) {
-                if (nfa->transitions[i][j][k]) {
-                    printf("%d ", k);
+// Function to print the NFA table
+void printNfaTable() {
+    printf("\nNFA transitions (excluding epsilon):\n");
+    for (int state = 0; state < numStates; state++) {
+        for (int symbol = 0; symbol < numSymbols; symbol++) {
+            printf("NFA transition from state %d on symbol '%c': { ", state, 'a' + symbol);
+            for (int nextState = 0; nextState < numStates; nextState++) {
+                if (nfa[state][symbol][nextState]) {
+                    printf("%d ", nextState);
                 }
             }
-            printf("\n");
+            printf("}\n");
         }
     }
 }
 
 int main() {
-    NFA nfa = {0};
-    int state_count, epsilon_transitions_count;
+    int numTransitions, fromState, toState;
+    char transitionSymbol;
 
-    // User input for number of states
-    printf("Enter the number of states: ");
-    scanf("%d", &state_count);
-    nfa.state_count = state_count;
+    // Read the number of states and symbols (excluding epsilon)
+    printf("Enter the number of states in the epsilon-NFA: ");
+    scanf("%d", &numStates);
+    printf("Enter the number of symbols (excluding epsilon): ");
+    scanf("%d", &numSymbols);
 
-    // User input for epsilon transitions
-    printf("Enter the number of epsilon transitions: ");
-    scanf("%d", &epsilon_transitions_count);
+    // Initialize tables
+    memset(epsilonTransitions, 0, sizeof(epsilonTransitions));
+    memset(closure, 0, sizeof(closure));
+    memset(nfa, 0, sizeof(nfa));
 
-    printf("Enter epsilon transitions (format: from to):\n");
-    for (int i = 0; i < epsilon_transitions_count; i++) {
-        int from, to;
-        scanf("%d %d", &from, &to);
-        add_epsilon_transition(from, to);
+    // Read transitions
+    printf("Enter the number of transitions: ");
+    scanf("%d", &numTransitions);
+    printf("Enter transitions (from_state to_state symbol), 'e' for epsilon:\n");
+    for (int i = 0; i < numTransitions; i++) {
+        scanf("%d %d %c", &fromState, &toState, &transitionSymbol);
+        if (transitionSymbol == 'e') {
+            epsilonTransitions[fromState][toState] = 1;
+        } else {
+            int symbolIndex = transitionSymbol - 'a';
+            nfa[fromState][symbolIndex][toState] = 1;
+        }
     }
 
-    // User input for other transitions
-    int other_transitions_count;
-    printf("Enter the number of other transitions: ");
-    scanf("%d", &other_transitions_count);
+    // Calculate epsilon closures
+    calculateEpsilonClosures();
 
-    printf("Enter transitions (format: from symbol to):\n");
-    for (int i = 0; i < other_transitions_count; i++) {
-        int from, to;
-        char symbol;
-        scanf("%d %c %d", &from, &symbol, &to);
-        int symbol_index = symbol - 'a'; // Assuming 'a' and 'b' are the only symbols
-        nfa.transitions[from][symbol_index][to] = 1; // Mark transition in the NFA
-    }
+    // Calculate NFA transitions
+    calculateNfaTransitions();
 
-    // Convert ε-NFA to NFA
-    convert_epsilon_nfa_to_nfa(state_count, &nfa);
-
-    // Print the resulting NFA
-    print_nfa(&nfa);
+    // Print the resulting NFA table
+    printNfaTable();
 
     return 0;
 }
