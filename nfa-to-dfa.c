@@ -1,167 +1,116 @@
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 
-#define MAX_STATES 10
-#define MAX_INPUT 10
-#define MAX_DFA_STATES 256 // To handle combinations of NFA states
+#define MAX_STATES 100
+#define MAX_SYMBOLS 26
 
-// Structure to represent an NFA
-typedef struct {
-    int nStates;                   // Number of states in NFA
-    int nSymbols;                  // Number of input symbols
-    int transition[MAX_STATES][MAX_INPUT][MAX_STATES]; // Transitions
-    int accepting[MAX_STATES];      // Accepting states
-} NFA;
+// Global structures for NFA and DFA transitions
+int nfa[MAX_STATES][MAX_SYMBOLS][MAX_STATES];   // NFA transition table
+int dfa[MAX_STATES][MAX_SYMBOLS];               // DFA transition table
+int deltas[MAX_STATES][MAX_SYMBOLS];            // Track NFA transitions in DFA formation
+int dfaStates[MAX_STATES][MAX_STATES];          // DFA states as a combination of NFA states
+int dfaStateCount = 0;                          // Count of DFA states
+int numStates, numSymbols;
 
-// Structure to represent a DFA
-typedef struct {
-    int nStates;                   // Number of states in DFA
-    int nSymbols;                  // Number of input symbols
-    int transition[MAX_DFA_STATES][MAX_INPUT]; // Transitions
-    int accepting[MAX_DFA_STATES]; // Accepting states
-    int stateComposition[MAX_DFA_STATES][MAX_STATES]; // Store composition of each DFA state
-} DFA;
-
-// Function to initialize NFA
-void initNFA(NFA *nfa, int nStates, int nSymbols) {
-    nfa->nStates = nStates;
-    nfa->nSymbols = nSymbols;
-    memset(nfa->transition, 0, sizeof(nfa->transition));
-    memset(nfa->accepting, 0, sizeof(nfa->accepting));
+// Function to check if a state combination exists in DFA
+int findDfaState(int stateSet[]) {
+    for (int i = 0; i < dfaStateCount; i++) {
+        int match = 1;
+        for (int j = 0; j < numStates; j++) {
+            if (dfaStates[i][j] != stateSet[j]) {
+                match = 0;
+                break;
+            }
+        }
+        if (match) return i;  // Existing DFA state found
+    }
+    return -1;  // New DFA state
 }
 
-// Function to add a transition to NFA
-void addTransition(NFA *nfa, int fromState, int symbol, int toState) {
-    nfa->transition[fromState][symbol][toState] = 1;
+// Function to add a new DFA state from a set of NFA states
+int addDfaState(int stateSet[]) {
+    for (int i = 0; i < numStates; i++) {
+        dfaStates[dfaStateCount][i] = stateSet[i];
+    }
+    return dfaStateCount++;  // Increment DFA state count
 }
 
-// Function to set accepting state in NFA
-void setAcceptingState(NFA *nfa, int state) {
-    nfa->accepting[state] = 1;
-}
+// Function to calculate DFA from NFA
+void convertNfaToDfa() {
+    int stateSet[MAX_STATES] = {0};
+    stateSet[0] = 1;  // Initial DFA state is the NFA start state
 
-// Function to convert NFA to DFA
-void convertNFAtoDFA(NFA *nfa, DFA *dfa) {
-    int stateMap[MAX_DFA_STATES] = {0}; // Map to check existing DFA states
-    dfa->nStates = 0;
-    dfa->nSymbols = nfa->nSymbols;
+    int initialDfaState = addDfaState(stateSet);  // Add initial state to DFA
 
-    // Initial DFA state from the start NFA state (assuming NFA starts at state 0)
-    int initialState[MAX_STATES] = {0};
-    initialState[0] = 1; // NFA state 0 is the starting state
+    for (int currentDfaState = 0; currentDfaState < dfaStateCount; currentDfaState++) {
+        for (int symbol = 0; symbol < numSymbols; symbol++) {
+            int newStateSet[MAX_STATES] = {0};  // New state set for this symbol
 
-    // Store initial state in DFA
-    int dfaStateIndex = dfa->nStates++;
-    memcpy(dfa->stateComposition[dfaStateIndex], initialState, sizeof(initialState));
-
-    // Traverse the NFA to create DFA states
-    for (int i = 0; i < dfa->nStates; i++) {
-        for (int j = 0; j < nfa->nSymbols; j++) {
-            int newState[MAX_STATES] = {0};
-
-            // Compute the next states for the current DFA state
-            for (int k = 0; k < MAX_STATES; k++) {
-                if (dfa->stateComposition[i][k]) {
-                    for (int l = 0; l < nfa->nStates; l++) {
-                        if (nfa->transition[k][j][l]) {
-                            newState[l] = 1; // Mark this NFA state as reachable
+            // Step 3: Calculate the union of transitions for current DFA state and symbol
+            for (int i = 0; i < numStates; i++) {
+                if (dfaStates[currentDfaState][i]) {
+                    for (int j = 0; j < numStates; j++) {
+                        if (nfa[i][symbol][j]) {
+                            newStateSet[j] = 1;  // Include state j in the new DFA state set
+                            deltas[i][symbol] = 1;  // Mark transition
                         }
                     }
                 }
             }
 
-            // Check if the new state already exists in DFA
-            int existingDFAState = -1;
-            for (int k = 0; k < dfa->nStates; k++) {
-                if (memcmp(newState, dfa->stateComposition[k], sizeof(newState)) == 0) {
-                    existingDFAState = k;
-                    break;
-                }
+            // Step 4: Check if this state set is already in the DFA
+            int existingStateIndex = findDfaState(newStateSet);
+            if (existingStateIndex == -1) {
+                existingStateIndex = addDfaState(newStateSet);  // Add new DFA state
             }
-
-            // If it doesn't exist, create a new DFA state
-            if (existingDFAState == -1) {
-                existingDFAState = dfa->nStates++;
-                memcpy(dfa->stateComposition[existingDFAState], newState, sizeof(newState));
-            }
-
-            // Add transition in DFA
-            dfa->transition[i][j] = existingDFAState;
-
-            // Mark accepting states in DFA
-            if (newState[nfa->nStates - 1]) { // Check if any NFA accepting state is reached
-                dfa->accepting[existingDFAState] = 1;
-            }
+            dfa[currentDfaState][symbol] = existingStateIndex;  // Record DFA transition
         }
     }
 }
 
-// Function to display DFA transitions and state compositions
-void displayDFA(DFA *dfa) {
-    printf("DFA States: %d\n", dfa->nStates);
-    printf("DFA Transitions:\n");
-    for (int i = 0; i < dfa->nStates; i++) {
-        printf("State %d (Composition: { ", i);
-        for (int k = 0; k < MAX_STATES; k++) {
-            if (dfa->stateComposition[i][k]) {
-                printf("%d ", k);
-            }
+// Function to print the DFA transition table
+void printDfaTable() {
+    printf("\nDFA Transition Table:\n");
+    for (int i = 0; i < dfaStateCount; i++) {
+        printf("DFA state %d: ", i);
+        for (int j = 0; j < numSymbols; j++) {
+            printf("On '%c' -> DFA state %d ", 'a' + j, dfa[i][j]);
         }
-        printf("})\n");
-        for (int j = 0; j < dfa->nSymbols; j++) {
-            printf("    --(%d)-> State %d\n", j, dfa->transition[i][j]);
-        }
+        printf("\n");
     }
-    printf("Accepting States: ");
-    for (int i = 0; i < dfa->nStates; i++) {
-        if (dfa->accepting[i]) {
-            printf("%d ", i);
-        }
-    }
-    printf("\n");
 }
 
 int main() {
-    NFA nfa;
-    DFA dfa;
+    int numTransitions, fromState, toState;
+    char transitionSymbol;
 
-    // Input number of states and input symbols
-    printf("Enter number of states in NFA: ");
-    scanf("%d", &nfa.nStates);
-    printf("Enter number of input symbols: ");
-    scanf("%d", &nfa.nSymbols);
+    // Read the number of NFA states and symbols (excluding epsilon)
+    printf("Enter the number of states in the NFA: ");
+    scanf("%d", &numStates);
+    printf("Enter the number of symbols (excluding epsilon): ");
+    scanf("%d", &numSymbols);
 
-    // Initialize NFA
-    initNFA(&nfa, nfa.nStates, nfa.nSymbols);
+    // Initialize NFA and DFA tables
+    memset(nfa, 0, sizeof(nfa));
+    memset(dfa, -1, sizeof(dfa));       // Use -1 to indicate no transition
+    memset(deltas, 0, sizeof(deltas));  // Track transitions for DFA construction
+    memset(dfaStates, 0, sizeof(dfaStates));
 
-    // Input transitions
-    int nTransitions;
-    printf("Enter number of transitions: ");
-    scanf("%d", &nTransitions);
-    for (int i = 0; i < nTransitions; i++) {
-        int fromState, symbol, toState;
-        printf("Enter transition (fromState symbol toState): ");
-        scanf("%d %d %d", &fromState, &symbol, &toState);
-        addTransition(&nfa, fromState, symbol, toState);
-    }
-
-    // Input accepting states
-    int nAccepting;
-    printf("Enter number of accepting states: ");
-    scanf("%d", &nAccepting);
-    for (int i = 0; i < nAccepting; i++) {
-        int state;
-        printf("Enter accepting state: ");
-        scanf("%d", &state);
-        setAcceptingState(&nfa, state);
+    // Read NFA transitions
+    printf("Enter the number of transitions in the NFA: ");
+    scanf("%d", &numTransitions);
+    printf("Enter transitions (from_state to_state symbol):\n");
+    for (int i = 0; i < numTransitions; i++) {
+        scanf("%d %d %c", &fromState, &toState, &transitionSymbol);
+        int symbolIndex = transitionSymbol - 'a';
+        nfa[fromState][symbolIndex][toState] = 1;
     }
 
     // Convert NFA to DFA
-    convertNFAtoDFA(&nfa, &dfa);
+    convertNfaToDfa();
 
-    // Display the DFA
-    displayDFA(&dfa);
+    // Print the DFA transition table
+    printDfaTable();
 
     return 0;
 }
