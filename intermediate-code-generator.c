@@ -10,11 +10,8 @@
 #include<string.h>
 #include <ctype.h>
 
-char queue[100];
-char s[100];
-char ind = '1';
-int count2 = 1;
-FILE *fp1,*fp2;
+char s[100], post[100], stack[100], queue[100];
+int top = -1, j = 0, front = -1;
 
 int precedence(char c){
     if(c == '+' || c == '-'){
@@ -31,87 +28,90 @@ int precedence(char c){
     }
 }
 
-void formatter(char post[100],char stack[100]){
-    int top = -1, j = 0, front = -1;
+void postfix(){
     int n = strlen(s), i = 0;
+    // While end of input string
     while(s[i] != '\0'){
+        // if '(' push to stack
         if(s[i] == '('){
             top++;
             stack[top] = s[i];
         }
+        // if alphabet append to output
         else if(isalpha(s[i])){
             post[j++] = s[i];
         }
+        // else if operator
         else if(precedence(s[i])){
+            // keep on popping as long as precednece (stack[top]) >= precednce(operator)
             while(precedence(stack[top]) >= precedence(s[i])){
                 post[j++] = stack[top--];
             }
+            // increment top and set stack top to operator
             top++;
             stack[top] = s[i];
         }
+        // else if ')'
         else if(s[i] == ')'){
+            // keep on popping as long as stack[top]!= '('
             while(stack[top] != '('){
                 post[j++] = stack[top--];
             }
+            // decrement top
             top--;
         }
+        // go to next input character
         i++;
     }
+    // pop remaining stack
     while(top!=-1){
         post[j++] = stack[top--];
     }
+    //append end char to output
     post[j] = '\0';
-    printf("Postfix expression: %s\n", post);
-    i = 0;
+}
+
+void main(){
+    int i = 0;
+    char ind = '1';
+    
+    FILE *fp,*fp1,*fp2,*fp3;
+    fp = fopen( "3addr.txt","w");
+    fp1 = fopen( "quadraple.txt","w");
+    fp2 = fopen( "triple.txt","w");
+    fprintf(fp,"Three Address\n");
+    fprintf(fp1,"Quadruple\nOP\tO1\tO2\tRES\n");
+    fprintf(fp2,"Triple\nIN\tOP\tO1\tO2\n");
+    fp3=fopen( "cd5inp.txt","r");
+    printf("Input the string: ");
+    
+    postfix();
+    while((fscanf(fp3,"%s",s))!=EOF)
+    {
+    postfix();
+    printf("Infix : %s \nPostfix : %s\n", s, post);
+    // while the postfix outputs end of string isnt reached'
     while(post[i] != '\0'){
+        // if operator
         if(precedence(post[i])){
+            // pop last two operands from queue
             char a = queue[front--];
             char b = queue[front--];
 
-            if(isdigit(a) && isdigit(b)){
-                fprintf(fp1,"%c\tt%c\tt%c\tt%c\n", post[i], b, a, ind);
-            }
-            else if(isdigit(b)){
-                fprintf(fp1,"%c\tt%c\t%c\tt%c\n", post[i], b, a, ind);
-            }
-            else if(isdigit(a)){
-                fprintf(fp1,"%c\t%c\tt%c\tt%c\n", post[i], b, a, ind);
-            }
-            else{
-                fprintf(fp1,"%c\t%c\t%c\tt%c\n", post[i], b, a, ind);
-            }
+            fprintf(fp,"t%c = t%c %c t%c\n", ind, b, post[i], a);
+            fprintf(fp1,"%c\tt%c\tt%c\tt%c\n", post[i], b, a, ind);
             fprintf(fp2,"%c\t%c\t%c\t%c\n", ind, post[i], b, a);
+            
             front++;
             queue[front] = ind;
             ind++;
-            count2++;
         }
+        // for operands, i.e., alphabets, add to queue
         else{
             front++;
             queue[front] = post[i];
         }
         i++;
     }
-}
-
-void main(){
-    int count;
-    fp1 = fopen( "quadruple-format.txt","w");
-    fp2 = fopen( "triple-format.txt","w");
-    fprintf(fp1,"QUADRUPLE\nOP\tO1\tO2\tRES\n");
-    fprintf(fp2,"TRIPLE\nIN\tOP\tO1\tO2\n");
-
-    printf("Enter the number of expressions:");
-    scanf("%d",&count);
-
-    int k;
-    for(k=0;k<count;k++){
-        memset(queue, '\0', sizeof(queue));
-        memset(s, '\0', sizeof(s));
-        char post[100], stack[100];
-        printf("Infix expression: ");
-        scanf("%s", s);
-        formatter(post, stack);
     }
-
 }
